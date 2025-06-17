@@ -4,25 +4,36 @@ from bpy.props import StringProperty, BoolProperty
 from bpy.types import Operator
 
 
-def convertCurveToMesh(context, filepath, apply_transform, operator):
+def convertCurveToMesh(context, filepath, apply_transform, reverse_vertices, operator):
     type = context.active_object.type
     if type != 'CURVE' and type != 'MESH':
         operator.report({"ERROR"}, "active object must be a Mesh or a Curve")
         return {"CANCELED"}
+
     bpy.ops.object.duplicate_move()
     if apply_transform == True:
         bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-    if type != "CURVE":
+
+    if type == "CURVE":
         bpy.ops.object.convert(target="MESH")
+
     vertices = context.active_object.data.vertices
+
     bpy.ops.object.delete()
+
     f = open(filepath, "w", encoding='utf-8')
     f.write("import {Vector3, CatmullRomCurve3} from 'three'\n")
     f.write("const curvePoints = [\n")
-    for vert in vertices:
-        c = vert.co
-        f.write("new Vector3({x}, {z}, {y}),\n".format(x=c[0], y=c[1]*-1, z=c[2]))
-        print(vert.co)
+
+    if reverse_vertices:
+        for vert in reversed(vertices):
+            c = vert.co
+            f.write("new Vector3({x}, {z}, {y}),\n".format(x=c[0], y=c[1]*-1, z=c[2]))
+    else:
+        for vert in vertices:
+            c = vert.co
+            f.write("new Vector3({x}, {z}, {y}),\n".format(x=c[0], y=c[1]*-1, z=c[2]))
+
     f.write("];\n")
     f.write("const curve = new CatmullRomCurve3(curvePoints);")
     f.close()
@@ -50,6 +61,12 @@ class CurveToThreeOperator(Operator, ExportHelper):
             default=False
     )
 
+    reverse_path: BoolProperty(
+            name="reverse path",
+            description="will generate the js array backward",
+            default=False
+    )
+
     # language: EnumProperty(
     #     name="language",
     #     description="use js or ts for export",
@@ -65,7 +82,7 @@ class CurveToThreeOperator(Operator, ExportHelper):
         return context.active_object is not None
 
     def execute(self, context):
-        return convertCurveToMesh(context, self.filepath, self.apply_transform, self)
+        return convertCurveToMesh(context, self.filepath, self.apply_transform, self.reverse_path, self)
 
 class CurveToThreejsPanel(bpy.types.Panel):
     bl_idname = "OBJECT_PT_curve_to_threejs2"
