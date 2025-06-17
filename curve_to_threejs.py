@@ -1,17 +1,19 @@
 import bpy
 from bpy_extras.io_utils import ExportHelper
-from bpy.props import StringProperty, BoolProperty, EnumProperty
+from bpy.props import StringProperty, BoolProperty
 from bpy.types import Operator
 
 
-def convertCurveToMesh(context, filepath, apply_transform):
+def convertCurveToMesh(context, filepath, apply_transform, operator):
     type = context.active_object.type
-    if type != "CURVE":
-        return {"CANCELLED"}
+    if type != 'CURVE' and type != 'MESH':
+        operator.report({"ERROR"}, "active object must be a Mesh or a Curve")
+        return {"CANCELED"}
     bpy.ops.object.duplicate_move()
     if apply_transform == True:
         bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-    bpy.ops.object.convert(target="MESH")
+    if type != "CURVE":
+        bpy.ops.object.convert(target="MESH")
     vertices = context.active_object.data.vertices
     bpy.ops.object.delete()
     f = open(filepath, "w", encoding='utf-8')
@@ -63,7 +65,7 @@ class CurveToThreeOperator(Operator, ExportHelper):
         return context.active_object is not None
 
     def execute(self, context):
-        return convertCurveToMesh(context, self.filepath, self.apply_transform)
+        return convertCurveToMesh(context, self.filepath, self.apply_transform, self)
 
 class CurveToThreejsPanel(bpy.types.Panel):
     bl_idname = "OBJECT_PT_curve_to_threejs2"
@@ -78,7 +80,7 @@ class CurveToThreejsPanel(bpy.types.Panel):
         button_row.operator("object.curve_to_three")
 
 
-def menu_func(self, context):
+def menu_func(self):
     self.layout.operator(
         CurveToThreeOperator.bl_idname, text=CurveToThreeOperator.bl_label
     )
@@ -87,19 +89,14 @@ def menu_func(self, context):
 def register():
     bpy.utils.register_class(CurveToThreeOperator)
     bpy.types.VIEW3D_MT_object.append(menu_func)
-    # bpy.types.VIEW3D_MT_object_convert.append(menu_func)
     bpy.utils.register_class(CurveToThreejsPanel)
 
 
 def unregister():
     bpy.utils.unregister_class(CurveToThreeOperator)
     bpy.types.VIEW3D_MT_object.remove(menu_func)
-    # bpy.types.VIEW3D_MT_curve_add.remove(menu_func)
     bpy.utils.unregister_class(CurveToThreejsPanel)
 
 
 if __name__ == "__main__":
     register()
-
-    # test call
-    # bpy.ops.object.simple_operator()
